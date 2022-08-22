@@ -1,27 +1,20 @@
-import useInfiniteScroll from "react-infinite-scroll-hook";
+// import useInfiniteScroll from "react-infinite-scroll-hook";
 import PhotoAlbum from "react-photo-album";
 import ImageViewer from "react-simple-image-viewer";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
+import { observer } from "mobx-react";
+import { fromEvent } from "rxjs";
 
+import { useStore } from "../hooks/use-store";
 import useLoadItems from "../hooks/use-load-items";
 
-export function Home() {
-  const {
-    loading,
-    items: photos,
-    error,
-    loadMore,
-  } = useLoadItems(process.env.REACT_APP_API_URL ?? "", {
-    client_id: process.env.REACT_APP_ACCESS_KEY ?? "",
-  });
+export const Home: React.FC = observer(() => {
+  const { photoStore } = useStore();
+  const { photos } = photoStore;
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const [sentryRef, { rootRef }] = useInfiniteScroll({
-    loading,
-    hasNextPage: true,
-    onLoadMore: loadMore,
-    disabled: !!error,
-    rootMargin: "0px 0px 400px 0px",
-    delayInMs: 1000,
+  const { loading, loadMore } = useLoadItems(process.env.REACT_APP_API_URL ?? "", {
+    client_id: process.env.REACT_APP_ACCESS_KEY ?? "",
   });
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -37,21 +30,38 @@ export function Home() {
     setIsViewerOpen(false);
   };
 
+  useEffect(() => {
+    if (!scrollContainerRef.current) return;
+
+    const scroll$ = fromEvent(scrollContainerRef.current, "scroll");
+
+    const subscription = scroll$.subscribe(() => {
+      if (!scrollContainerRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+
+      if (scrollTop === scrollHeight - clientHeight) {
+        loadMore();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
     <div className="App-header">
-      <div className="scroll-container" ref={rootRef}>
+      <div className="scroll-container" ref={scrollContainerRef}>
         <h1>Vector's Portfolio</h1>
         <PhotoAlbum
           layout="masonry"
           photos={photos}
           onClick={(_event, _photo, index) => openImageViewer(index)}
         />
-        <div ref={sentryRef}>...Loading</div>
+        {loading && <div>...Loading</div>}
       </div>
 
       {isViewerOpen && (
         <ImageViewer
-          src={photos.map((photo) => photo.src)}
+          src={photos.map((photo) => photo.src_full ?? " ")}
           currentIndex={currentImageIndex}
           disableScroll={false}
           closeOnClickOutside={true}
@@ -60,4 +70,4 @@ export function Home() {
       )}
     </div>
   );
-}
+});
