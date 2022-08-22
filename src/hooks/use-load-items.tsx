@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { Photo as PhotoAlbumPhoto } from "react-photo-album";
-import { Photo } from "../types";
 
-const perPage = 10;
+import { useStore } from "./use-store";
+import { Photo } from "../types";
 
 function useLoadItems(url: string, query: Record<string, number | string>) {
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<PhotoAlbumPhoto[]>([]);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<Error | null>(null);
+  const { photoStore } = useStore();
+  const { addPhotoItems } = photoStore;
+  const perPage = 10;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -26,25 +28,23 @@ function useLoadItems(url: string, query: Record<string, number | string>) {
         let response = await fetch(url + "?" + urlParams, {});
         const fetchedData = await response.json();
 
-        const photos = [
-          ...items,
-          ...fetchedData.results.map(
-            (photo: Photo): PhotoAlbumPhoto => ({
-              key: photo.urls.thumb,
-              src: photo.urls.thumb,
-              images: [
-                {
-                  src: photo.urls.thumb,
-                  width: photo.width,
-                  height: photo.height,
-                },
-              ],
-              width: photo.width,
-              height: photo.height,
-            }),
-          ),
-        ];
-        setItems(photos);
+        addPhotoItems(
+          fetchedData.results.map((photo: Photo) => ({
+            key: photo.urls.thumb,
+            src: photo.urls.thumb,
+            src_full: photo.urls.small,
+            images: [
+              {
+                src: photo.urls.thumb,
+                width: photo.width,
+                height: photo.height,
+                src_full: photo.urls.small,
+              },
+            ],
+            width: photo.width,
+            height: photo.height,
+          })),
+        );
         setLoading(false);
       } catch (err: unknown) {
         setError(err as Error);
@@ -58,7 +58,7 @@ function useLoadItems(url: string, query: Record<string, number | string>) {
     setPage((page) => page + 1);
   }
 
-  return { loading, items, error, loadMore };
+  return { loading, loadMore };
 }
 
 export default useLoadItems;
